@@ -20,7 +20,7 @@ LOCAL_APK="$BASE_DIR/${PACKAGE_NAME}.apk"
 
 mkdir -p "$DEX_DIR"
 echo "📦 APK에서 DEX 추출 중..."
-unzip -j "$LOCAL_APK" '*.dex' -d "$DEX_DIR"
+unzip -j -o "$LOCAL_APK" '*.dex' -d "$DEX_DIR"
 
 [[ -z "$DEX_DIR" || ! -d "$DEX_DIR" ]] && { echo "❌ DEX 폴더 오류"; exit 1; }
 
