@@ -7,6 +7,17 @@ if [ -z "$PACKAGE_NAME" ]; then
     exit 1
 fi
 
+if ! command -v adb >/dev/null 2>&1; then
+  echo "🔧 adb가 설치되어 있지 않아 설치를 진행합니다..."
+  sudo apt update
+  sudo apt install -y adb
+fi
+
+if ! command -v java >/dev/null 2>&1; then
+  echo "☕ Java가 설치되어 있지 않아 설치를 진행합니다..."
+  sudo apt update && sudo apt install -y default-jre
+fi
+
 PKG=$(adb shell "pm list packages" | grep "$PACKAGE_NAME" | head -n 1 | cut -d: -f2)
 
 PACKAGE_NAME=$PKG
