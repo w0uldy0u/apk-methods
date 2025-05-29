@@ -36,26 +36,18 @@ wait
 
 echo "🔎 메서드 파싱 중..."
 python3 - "$OUT_ROOT" "$LIST_TXT" <<'PY'
-import pathlib, sys
+import pathlib, sys, os
 from concurrent.futures import ThreadPoolExecutor
 
 root = pathlib.Path(sys.argv[1]).resolve()
 out = pathlib.Path(sys.argv[2]).open('w')
-items = set()
-
 EXCLUDED_PREFIXES = (
-    "android.",
-    "androidx.",
-    "com.android.",
-    "com.google.android.",
-    "dalvik.",
-    "java.",
-    "javax.",
-    "kotlin.",
+    "android.", "androidx.", "com.android.", "com.google.android.",
+    "dalvik.", "java.", "javax.", "kotlin."
 )
 
 def extract_methods(smali):
-    results = set()
+    results = []
     parts = smali.relative_to(root).with_suffix('').parts
     if parts[0].startswith("classes"):
         parts = parts[1:]
@@ -73,20 +65,22 @@ def extract_methods(smali):
                 if len(tokens) < 2:
                     continue
                 name = tokens[-1].split('(')[0]
-                if name == "<init>":
-                    name = "$init"
-                elif name == "<clinit>":
-                    name = "$clinit"
-                results.add(f"{cls}.{name}")
-    except Exception:
+                if name == "<init>": name = "$init"
+                elif name == "<clinit>": name = "$clinit"
+                results.append(f"{cls}.{name}")
+    except:
         pass
     return results
 
-with ThreadPoolExecutor() as executor:
-    for result in executor.map(extract_methods, root.rglob('*.smali')):
-        items.update(result)
+smali_files = list(root.rglob('*.smali'))
+with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+    all_methods = executor.map(extract_methods, smali_files)
 
-out.write('\n'.join(sorted(items)))
+flat = set()
+for method_list in all_methods:
+    flat.update(method_list)
+
+out.writelines(f"{m}\n" for m in sorted(flat))
 PY
 
 echo "✅ 자바 함수 목록 → $LIST_TXT (총 $(wc -l < "$LIST_TXT")개)"
