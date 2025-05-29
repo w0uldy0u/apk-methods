@@ -30,8 +30,9 @@ echo
 echo "📂 smali 변환…"
 for dex in "$DEX_DIR"/*.dex; do
   [[ -f "$dex" ]] && java -jar "$BAKSMALI_JAR" d "$dex" \
-        -o "$OUT_ROOT/$(basename "$dex" .dex)" >/dev/null
+        -o "$OUT_ROOT/$(basename "$dex" .dex)" >/dev/null &
 done
+wait
 
 echo "🔎 메서드 파싱 중..."
 python3 - "$OUT_ROOT" "$LIST_TXT" <<'PY'
