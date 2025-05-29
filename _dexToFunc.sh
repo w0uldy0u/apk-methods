@@ -1,15 +1,4 @@
 #!/bin/bash
-# dex2frida-ready.sh
-#
-# 1) baksmali 최신 fat-jar 자동 다운로드
-# 2) *.dex → smali
-# 3) .method →  <클래스>.<메서드> 형식으로 출력
-#    ◦ 멀티-DEX 접두사(classes, classes2…) 제거
-#    ◦ <init>/<clinit> → $init/$clinit
-#
-# 사용: ./dex2frida-ready.sh <dex_폴더>
-# ---------------------------------------------------------------
-
 set -e
 
 BASE_DIR="$1"
@@ -44,24 +33,32 @@ for dex in "$DEX_DIR"/*.dex; do
         -o "$OUT_ROOT/$(basename "$dex" .dex)" >/dev/null
 done
 
+echo "🔎 메서드 파싱 중..."
 python3 - "$OUT_ROOT" "$LIST_TXT" <<'PY'
-import pathlib, re, sys
-root = pathlib.Path(sys.argv[1]).resolve()
-out  = pathlib.Path(sys.argv[2]).open('w')
+import pathlib, sys
 
+root = pathlib.Path(sys.argv[1]).resolve()
+out = pathlib.Path(sys.argv[2]).open('w')
 items = set()
+
 for smali in root.rglob('*.smali'):
     parts = smali.relative_to(root).with_suffix('').parts
-    # classes / classes2 … 접두사 제거
-    if re.match(r'^classes\d*$', parts[0]): parts = parts[1:]
+    if parts[0].startswith("classes"): parts = parts[1:]
     cls = '.'.join(parts)
-    for line in smali.open():
-        m = re.match(r'^\s*\.method\s+(?:[\w\s-]+?\s+)?(\S+)$', line)
-        if not m: continue
-        name = m.group(1).split('(')[0]
-        if   name == '<init>'  : name = '$init'
-        elif name == '<clinit>': name = '$clinit'
-        items.add(f"{cls}.{name}")
+
+    try:
+        with smali.open('r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.lstrip()
+                if not line.startswith(".method"): continue
+                parts = line.split()
+                if len(parts) < 2: continue
+                name = parts[-1].split('(')[0]
+                if name == "<init>": name = "$init"
+                elif name == "<clinit>": name = "$clinit"
+                items.add(f"{cls}.{name}")
+    except Exception: pass  # skip unreadable file
+
 out.write('\n'.join(sorted(items)))
 PY
 
