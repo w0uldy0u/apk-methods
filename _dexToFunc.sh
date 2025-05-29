@@ -41,10 +41,24 @@ root = pathlib.Path(sys.argv[1]).resolve()
 out = pathlib.Path(sys.argv[2]).open('w')
 items = set()
 
+EXCLUDED_PREFIXES = (
+    "android.",
+    "androidx.",
+    "com.android.",
+    "com.google.android.",
+    "dalvik.",
+    "java.",
+    "javax.",
+    "kotlin.",
+)
+
 for smali in root.rglob('*.smali'):
     parts = smali.relative_to(root).with_suffix('').parts
     if parts[0].startswith("classes"): parts = parts[1:]
     cls = '.'.join(parts)
+
+    if cls.startswith(EXCLUDED_PREFIXES):
+        continue
 
     try:
         with smali.open('r', encoding='utf-8', errors='ignore') as f:
@@ -57,7 +71,8 @@ for smali in root.rglob('*.smali'):
                 if name == "<init>": name = "$init"
                 elif name == "<clinit>": name = "$clinit"
                 items.add(f"{cls}.{name}")
-    except Exception: pass  # skip unreadable file
+    except Exception:
+        pass  # skip unreadable file
 
 out.write('\n'.join(sorted(items)))
 PY
