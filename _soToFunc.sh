@@ -22,6 +22,7 @@ mkdir -p "$OUT_DIR"
 UNZIP_OUTPUT=$( (unzip -q -o "$APK" "lib/**/*.so" -d "$OUT_DIR") 2>&1 || true )
 if echo "$UNZIP_OUTPUT" | grep -q "caution: filename not matched"; then
   echo "⚠️  .so 파일이 없는 APK입니다 (Java-only 앱일 수 있습니다)."
+  rm -rf "$OUT_DIR"
   exit 0
 fi
 
