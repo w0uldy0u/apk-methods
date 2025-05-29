@@ -37,6 +37,7 @@ wait
 echo "🔎 메서드 파싱 중..."
 python3 - "$OUT_ROOT" "$LIST_TXT" <<'PY'
 import pathlib, sys
+from concurrent.futures import ThreadPoolExecutor
 
 root = pathlib.Path(sys.argv[1]).resolve()
 out = pathlib.Path(sys.argv[2]).open('w')
@@ -53,27 +54,37 @@ EXCLUDED_PREFIXES = (
     "kotlin.",
 )
 
-for smali in root.rglob('*.smali'):
+def extract_methods(smali):
+    results = set()
     parts = smali.relative_to(root).with_suffix('').parts
-    if parts[0].startswith("classes"): parts = parts[1:]
+    if parts[0].startswith("classes"):
+        parts = parts[1:]
     cls = '.'.join(parts)
-
     if cls.startswith(EXCLUDED_PREFIXES):
-        continue
+        return results
 
     try:
         with smali.open('r', encoding='utf-8', errors='ignore') as f:
             for line in f:
                 line = line.lstrip()
-                if not line.startswith(".method"): continue
-                parts = line.split()
-                if len(parts) < 2: continue
-                name = parts[-1].split('(')[0]
-                if name == "<init>": name = "$init"
-                elif name == "<clinit>": name = "$clinit"
-                items.add(f"{cls}.{name}")
+                if not line.startswith(".method"):
+                    continue
+                tokens = line.split()
+                if len(tokens) < 2:
+                    continue
+                name = tokens[-1].split('(')[0]
+                if name == "<init>":
+                    name = "$init"
+                elif name == "<clinit>":
+                    name = "$clinit"
+                results.add(f"{cls}.{name}")
     except Exception:
-        pass  # skip unreadable file
+        pass
+    return results
+
+with ThreadPoolExecutor() as executor:
+    for result in executor.map(extract_methods, root.rglob('*.smali')):
+        items.update(result)
 
 out.write('\n'.join(sorted(items)))
 PY
