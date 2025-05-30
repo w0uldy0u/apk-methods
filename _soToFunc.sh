@@ -27,11 +27,26 @@ if echo "$UNZIP_OUTPUT" | grep -q "caution: filename not matched"; then
 fi
 
 echo "🔍 JNI 네이티브 심볼 추출 중..."
+> "$FUNC_LIST"
+
 for sofile in $(find "$OUT_DIR" -name '*.so'); do
-  nm -D --defined-only "$sofile" 2>/dev/null | awk '{print $3}' \
-    | grep '^Java_' \
-    | sort -u >> "$FUNC_LIST"
+  echo "📦 처리 중: $sofile"
+
+  # nm 결과에서: 타입이 'T', 't'인 심볼만 추출
+  nm -D --defined-only "$sofile" 2>/dev/null | awk '$2 ~ /^[Tt]$/ {print $3}' | while read sym; do
+    # Java JNI
+    if [[ "$sym" == Java_* ]]; then
+      echo "$sym" >> "$FUNC_LIST"
+    # C/C++ 네이티브 함수
+    elif [[ "$sym" == JNI_* || "$sym" == native_* || "$sym" == _Z* ]]; then
+      if [[ "$sym" != _ZTV* && "$sym" != _ZTI* && "$sym" != _ZTS* && "$sym" != _ZTT* ]]; then
+        echo "$sym" >> "$FUNC_LIST"
+      fi
+    fi
+  done
 done
+
+sort -u "$FUNC_LIST" -o "$FUNC_LIST"
 
 echo "✅ 네이티브 함수 목록 → $FUNC_LIST (총 $(wc -l < "$FUNC_LIST")개)"
 echo
