@@ -2,16 +2,26 @@
 set -e
 
 BASE_DIR="$1"
-PACKAGE_NAME="$2"
+shift
 
 DEX_DIR="$BASE_DIR/dex"
-LOCAL_APK="$BASE_DIR/${PACKAGE_NAME}.apk"
-
 mkdir -p "$DEX_DIR"
 echo "📦 APK에서 DEX 추출 중..."
-unzip -j -o "$LOCAL_APK" '*.dex' -d "$DEX_DIR"
 
-[[ -z "$DEX_DIR" || ! -d "$DEX_DIR" ]] && { echo "❌ DEX 폴더 오류"; exit 1; }
+for apk in "$@"; do
+  # 1) APK 내부에 .dex가 하나라도 있는지 확인
+  if unzip -l "$apk" | grep -q '\.dex$'; then
+    unzip -j -o "$apk" '*.dex' -d "$DEX_DIR" 2>/dev/null
+  else
+    echo "⚠️  $apk 에는 .dex 파일이 없습니다."
+  fi
+done
+
+# DEX_DIR 자체가 없거나 비어 있으면 에러 처리
+if [[ ! -d "$DEX_DIR" || -z "$(ls -A "$DEX_DIR")" ]]; then
+  echo "❌ DEX 폴더 오류 또는 추출된 .dex 파일이 없습니다."
+  exit 1
+fi
 
 BAKSMALI_JAR="baksmali.jar"
 if [[ ! -f "$BAKSMALI_JAR" ]]; then
@@ -24,7 +34,8 @@ fi
 
 OUT_ROOT="$BASE_DIR/smali_out"
 LIST_TXT="$BASE_DIR/java_methods.txt"
-rm -rf "$OUT_ROOT"; mkdir -p "$OUT_ROOT"
+rm -rf "$OUT_ROOT" "$LIST_TXT"
+mkdir -p "$OUT_ROOT"
 
 echo
 echo "📂 smali 변환…"
@@ -84,7 +95,6 @@ out.writelines(f"{m}\n" for m in sorted(flat))
 PY
 
 echo "✅ 자바 함수 목록 → $LIST_TXT (총 $(wc -l < "$LIST_TXT")개)"
-
 echo
 echo "==================================================="
 echo "🎯 랜덤 10개 JAVA 메서드:"
@@ -92,4 +102,3 @@ shuf -n 10 "$LIST_TXT"
 echo "==================================================="
 
 rm -rf "$OUT_ROOT" "$DEX_DIR"
-echo
